@@ -2,9 +2,11 @@ name: AI QA Agent - CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -15,10 +17,11 @@ jobs:
 
     steps:
       - name: Checkout repository
-	uses: actions/checkout@v5
+        uses: actions/checkout@v5
 
       - name: Set up Python
-	uses: actions/setup-python@v6
+        uses: actions/setup-python@v6
+        with:
           python-version: "3.12"
 
       - name: Upgrade pip
