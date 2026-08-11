@@ -1,4 +1,8 @@
-# 🤖 AI QA Agent
+git add README.md
+git commit -m "Add CI badge to README"
+git push# 🤖 AI QA Agent
+
+![CI](https://github.com/juliqatest/ai-qa-agent/actions/workflows/qa-check.yml/badge.svg)
 
 AI QA Agent es un proyecto experimental de Quality Assurance que combina
 Inteligencia Artificial generativa con automatización de pruebas utilizando
