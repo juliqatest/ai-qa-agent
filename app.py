@@ -11,6 +11,8 @@ load_dotenv()
 client = genai.Client()
 
 MODEL = "gemini-3.5-flash-lite"
+IS_CI = os.getenv("GITHUB_ACTIONS") == "true"
+HEADLESS = IS_CI
 
 print("\n🤖 AI QA AGENT")
 print("============================")
@@ -114,7 +116,7 @@ password: secret_sauce
 REGLAS:
 - Usá playwright.sync_api.
 - Usá sync_playwright.
-- Chromium con headless=False.
+- Chromium debe abrirse con headless={HEADLESS}.
 - No uses pytest.
 - No uses fixtures.
 - No uses funciones test_*.
