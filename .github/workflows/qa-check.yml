@@ -50,6 +50,18 @@ jobs:
           CI_STORY: "Como usuario quiero iniciar sesión con mi usuario y contraseña para acceder al sistema."
         run: python app.py
 
+      - name: Upload QA artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-results
+          path: |
+            results.json
+            qa_report.md
+            evidence_*.png
+            bug_report_*.md
+          if-no-files-found: ignore
+
       - name: Verify Gemini secret
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
