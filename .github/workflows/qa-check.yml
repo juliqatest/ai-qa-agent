@@ -44,6 +44,12 @@ jobs:
       - name: Run Playwright smoke test
         run: python ci_smoke_test.py
 
+      - name: Run AI QA Agent
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CI_STORY: "Como usuario quiero iniciar sesión con mi usuario y contraseña para acceder al sistema."
+        run: python app.py
+
       - name: Verify Gemini secret
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
