@@ -41,6 +41,9 @@ jobs:
           python -c "from google import genai; print('Gemini SDK OK')"
           python -c "from playwright.sync_api import sync_playwright; print('Playwright OK')"
 
+      - name: Run Playwright smoke test
+        run: python ci_smoke_test.py
+
       - name: Verify Gemini secret
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
