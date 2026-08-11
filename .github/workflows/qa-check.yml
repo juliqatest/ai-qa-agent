@@ -40,3 +40,9 @@ jobs:
         run: |
           python -c "from google import genai; print('Gemini SDK OK')"
           python -c "from playwright.sync_api import sync_playwright; print('Playwright OK')"
+
+      - name: Verify Gemini secret
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python -c "import os; assert os.getenv('GEMINI_API_KEY'), 'GEMINI_API_KEY is missing'; print('Gemini secret available')"
