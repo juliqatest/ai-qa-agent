@@ -46,3 +46,21 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python -c "import os; assert os.getenv('GEMINI_API_KEY'), 'GEMINI_API_KEY is missing'; print('Gemini secret available')"
+
+      - name: Test Gemini API
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python - <<'PY'
+          from google import genai
+
+          client = genai.Client()
+
+          response = client.models.generate_content(
+              model="gemini-3.5-flash-lite",
+              contents="Respondé únicamente con: GEMINI_OK"
+          )
+
+          assert "GEMINI_OK" in response.text
+          print("Gemini API connection OK")
+          PY
