@@ -18,7 +18,13 @@ print("\n🤖 AI QA AGENT")
 print("============================")
 print("Historia → Tests → Playwright → Análisis → Reporte\n")
 
-historia = input("Historia de usuario: ").strip()
+ci_story = os.getenv("CI_STORY")
+
+if ci_story:
+    historia = ci_story.strip()
+    print(f"Historia de usuario: {historia}")
+else:
+    historia = input("Historia de usuario: ").strip()
 
 if historia.lower() == "salir":
     print("Agente finalizado.")
