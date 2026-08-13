@@ -1,16 +1,23 @@
 import json
 import os
-import subprocess
 
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+from src.test_generator import generar_casos
+from src.playwright_generator import generar_playwright
+from src.failure_analyzer import analizar_fallo
+from src.report_generator import generar_reporte
+from src.bug_report_generator import generar_bug_report
+from src.test_runner import ejecutar_test
+from src.code_validator import validar_codigo_python
+from src.code_fixer import corregir_codigo
+from src.config import MODEL, TEST_TIMEOUT
 
 load_dotenv()
 
 client = genai.Client()
 
-MODEL = "gemini-3.5-flash-lite"
 IS_CI = os.getenv("GITHUB_ACTIONS") == "true"
 HEADLESS = IS_CI
 
@@ -36,50 +43,15 @@ if historia.lower() == "salir":
 
 print("\n🤖 Generando casos de prueba...")
 
-prompt_tests = f"""
-Sos un QA Analyst Senior.
-
-Analizá esta historia de usuario:
-
-{historia}
-
-Generá únicamente JSON válido con esta estructura:
-
-{{
-  "test_cases": [
-    {{
-      "id": "TC001",
-      "title": "Título",
-      "priority": "High",
-      "steps": [
-        "Paso 1",
-        "Paso 2"
-      ],
-      "expected_result": "Resultado esperado"
-    }}
-  ],
-  "edge_cases": [],
-  "risks": [],
-  "questions": []
-}}
-
-REGLAS:
-- No uses Markdown.
-- No agregues explicaciones.
-- No inventes requisitos.
-- Generá casos positivos y negativos relevantes.
-"""
-
-response = client.models.generate_content(
-    model=MODEL,
-    contents=prompt_tests
-)
-
 try:
-    datos = json.loads(response.text)
+    datos = generar_casos(
+        client=client,
+        model=MODEL,
+        historia=historia
+    )
+
 except json.JSONDecodeError:
     print("❌ Gemini no devolvió JSON válido.")
-    print(response.text)
     exit()
 
 with open("tests.json", "w", encoding="utf-8") as archivo:
@@ -102,56 +74,45 @@ for test in datos["test_cases"]:
     print(f"▶️ {test_id}: {titulo}")
     print("🤖 Generando Playwright...")
 
-    prompt_playwright = f"""
-Sos un QA Automation Engineer experto en Playwright Python.
-
-Generá un script completo y ejecutable para este caso:
-
-ID: {test_id}
-Título: {titulo}
-Pasos: {test["steps"]}
-Resultado esperado: {test["expected_result"]}
-
-Aplicación:
-https://www.saucedemo.com/
-
-Credenciales válidas:
-usuario: standard_user
-password: secret_sauce
-
-REGLAS:
-- Usá playwright.sync_api.
-- Usá sync_playwright.
-- Chromium debe abrirse con headless={HEADLESS}.
-- No uses pytest.
-- No uses fixtures.
-- No uses funciones test_*.
-- No uses Markdown.
-- Devolvé únicamente Python ejecutable.
-- Cerrá el navegador al finalizar.
-
-Si ocurre cualquier error:
-
-- Tomá screenshot.
-- Guardalo exactamente como:
-  evidence_{test_id}.png
-
-Usá try/except/finally.
-En el except:
-- screenshot
-- raise
-
-El programa debe devolver exit code distinto de 0 si falla.
-"""
-
-    response = client.models.generate_content(
+    codigo = generar_playwright(
+        client=client,
         model=MODEL,
-        contents=prompt_playwright
+        test=test,
+        headless=HEADLESS
     )
 
-    codigo = response.text.strip()
-    codigo = codigo.replace("```python", "")
-    codigo = codigo.replace("```", "")
+    validacion = validar_codigo_python(codigo)
+
+    if not validacion["valid"]:
+        print("⚠️ Gemini generó Python inválido.")
+        print(f"   {validacion['error']}")
+        print("🔧 Intentando autocorrección...")
+
+        codigo = corregir_codigo(
+            client=client,
+            model=MODEL,
+            codigo=codigo,
+            error=validacion["error"],
+            test=test,
+            headless=HEADLESS
+        )
+
+        segunda_validacion = validar_codigo_python(codigo)
+
+        if not segunda_validacion["valid"]:
+            print("❌ TEST_ERROR: la autocorrección también es inválida.")
+
+            resultados.append({
+                "id": test_id,
+                "title": titulo,
+                "status": "FAIL",
+                "failure_type": "TEST_ERROR",
+                "error": segunda_validacion["error"]
+            })
+
+            continue
+
+        print("✅ Código corregido y validado.")
 
     archivo_test = f"test_{test_id}.py"
 
@@ -160,15 +121,12 @@ El programa debe devolver exit code distinto de 0 si falla.
 
     print("🧪 Ejecutando Playwright...")
 
-    try:
-        resultado = subprocess.run(
-            ["python", archivo_test],
-            capture_output=True,
-            text=True,
-            timeout=45
-        )
+    resultado = ejecutar_test(
+        archivo_test=archivo_test,
+	timeout=TEST_TIMEOUT
+    )
 
-    except subprocess.TimeoutExpired:
+    if resultado["failure_type"] == "TIMEOUT":
 
         print("⏱️ TIMEOUT")
 
@@ -177,13 +135,23 @@ El programa debe devolver exit code distinto de 0 si falla.
             "title": titulo,
             "status": "FAIL",
             "failure_type": "TIMEOUT",
-            "error": "El test excedió el timeout máximo."
+            "error": resultado["stderr"]
         })
 
         continue
 
-    if resultado.returncode == 0:
+    if resultado["status"] == "PASS":
 
+        print("✅ PASS")
+
+        resultados.append({
+            "id": test_id,
+            "title": titulo,
+            "status": "PASS"
+        })
+
+        continue
+    if resultado["status"] == "PASS":
         print("✅ PASS")
 
         resultados.append({
@@ -200,93 +168,17 @@ El programa debe devolver exit code distinto de 0 si falla.
 
     print("❌ FAIL")
 
-    error = resultado.stderr
+    error = resultado["stderr"]
     screenshot = f"evidence_{test_id}.png"
 
-    prompt_failure = f"""
-Sos un QA Analyst Senior.
-
-Analizá este fallo de una prueba automática.
-
-Historia:
-{historia}
-
-Caso:
-{test_id} - {titulo}
-
-Pasos:
-{test["steps"]}
-
-Resultado esperado:
-{test["expected_result"]}
-
-Error:
-
-{error}
-
-Clasificá el fallo como una de estas opciones:
-
-BUG
-TEST_ERROR
-TEST_DATA
-ENVIRONMENT
-NEEDS_INVESTIGATION
-
-Generá además:
-
-- cause
-- severity
-- bug_title
-- expected
-- actual
-- recommendation
-
-Respondé ÚNICAMENTE JSON válido con esta estructura:
-
-{{
-  "classification": "BUG",
-  "cause": "",
-  "severity": "",
-  "bug_title": "",
-  "expected": "",
-  "actual": "",
-  "recommendation": ""
-}}
-
-No inventes información.
-"""
-
-    contenido = [prompt_failure]
-
-    if os.path.exists(screenshot):
-
-        with open(screenshot, "rb") as archivo:
-            imagen = archivo.read()
-
-        contenido.append(
-            types.Part.from_bytes(
-                data=imagen,
-                mime_type="image/png"
-            )
-        )
-
-    response = client.models.generate_content(
+    analisis = analizar_fallo(
+        client=client,
         model=MODEL,
-        contents=contenido
+        historia=historia,
+        test=test,
+        error=error,
+        screenshot=screenshot
     )
-
-    try:
-        analisis = json.loads(response.text)
-    except json.JSONDecodeError:
-        analisis = {
-            "classification": "NEEDS_INVESTIGATION",
-            "cause": response.text,
-            "severity": "Unknown",
-            "bug_title": "",
-            "expected": test["expected_result"],
-            "actual": "No determinado",
-            "recommendation": "Revisión manual"
-        }
 
     print(
         "🤖 Clasificación:",
@@ -312,47 +204,14 @@ No inventes información.
 
         nombre_bug = f"bug_report_{test_id}.md"
 
+        contenido_bug = generar_bug_report(
+            test=test,
+            analisis=analisis,
+            screenshot=screenshot if os.path.exists(screenshot) else None
+        )
+
         with open(nombre_bug, "w", encoding="utf-8") as archivo:
-
-            archivo.write(f"# Bug Report - {test_id}\n\n")
-
-            archivo.write(
-                f"## Título\n{analisis['bug_title']}\n\n"
-            )
-
-            archivo.write(
-                f"## Severidad\n{analisis['severity']}\n\n"
-            )
-
-            archivo.write("## Pasos para reproducir\n")
-
-            for paso in test["steps"]:
-                archivo.write(f"- {paso}\n")
-
-            archivo.write(
-                f"\n## Resultado esperado\n"
-                f"{analisis['expected']}\n\n"
-            )
-
-            archivo.write(
-                f"## Resultado actual\n"
-                f"{analisis['actual']}\n\n"
-            )
-
-            archivo.write(
-                f"## Causa probable\n"
-                f"{analisis['cause']}\n\n"
-            )
-
-            if os.path.exists(screenshot):
-                archivo.write(
-                    f"## Evidencia\n{screenshot}\n\n"
-                )
-
-            archivo.write(
-                f"## Recomendación\n"
-                f"{analisis['recommendation']}\n"
-            )
+            archivo.write(contenido_bug)
 
         print(f"🐛 Bug Report creado: {nombre_bug}")
 
@@ -395,46 +254,14 @@ print(f"FAIL:  {failed}")
 print(f"BUGS:  {bugs}")
 print("======================================")
 
-resumen_json = json.dumps(
-    resultados,
-    indent=2,
-    ensure_ascii=False
-)
-
-prompt_report = f"""
-Sos un QA Lead Senior.
-
-Generá un reporte QA profesional basándote únicamente
-en estos resultados:
-
-{resumen_json}
-
-Incluí:
-
-1. Resumen de ejecución
-2. Cobertura
-3. Fallos
-4. Bugs confirmados
-5. Errores de automatización o datos
-6. Riesgos
-7. Recomendaciones
-8. Conclusión
-
-REGLAS:
-- No inventes fechas.
-- No inventes ambientes.
-- No inventes bugs.
-- Diferenciá claramente bug de error de test.
-- Respondé en español.
-"""
-
-response = client.models.generate_content(
+reporte = generar_reporte(
+    client=client,
     model=MODEL,
-    contents=prompt_report
+    resultados=resultados
 )
 
 with open("qa_report.md", "w", encoding="utf-8") as archivo:
-    archivo.write(response.text)
+    archivo.write(reporte)
 
 print("\n📄 results.json generado")
 print("📄 qa_report.md generado")
