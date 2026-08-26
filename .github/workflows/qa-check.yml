@@ -44,30 +44,6 @@ jobs:
       - name: Run agent unit tests
         run: pytest -v
 
-      - name: Run Playwright smoke test
-        run: python ci_smoke_test.py
-
-      - name: Run AI QA Agent
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          CI_STORY: "Como usuario quiero iniciar sesión con mi usuario y contraseña para acceder al sistema.
-	  BASE_URL: "https://www.saucedemo.com/"
-          TEST_USERNAME: "standard_user"
-          TEST_PASSWORD: "secret_sauce""
-        run: python app.py
-
-      - name: Upload QA artifacts
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: qa-results
-          path: |
-            results.json
-            qa_report.md
-            evidence_*.png
-            bug_report_*.md
-          if-no-files-found: ignore
-
       - name: Verify Gemini secret
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -91,3 +67,28 @@ jobs:
           assert "GEMINI_OK" in response.text
           print("Gemini API connection OK")
           PY
+
+      - name: Run Playwright smoke test
+        run: python ci_smoke_test.py
+
+      - name: Run AI QA Agent
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BASE_URL: "https://www.saucedemo.com/"
+          TEST_USERNAME: "standard_user"
+          TEST_PASSWORD: "secret_sauce"
+          CI_STORY: "Como usuario quiero iniciar sesión con mi usuario y contraseña para acceder al sistema."
+        run: python app.py
+
+      - name: Upload QA artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: qa-results
+          path: |
+            results.json
+            qa_report.md
+            evidence_*.png
+            bug_report_*.md
+            runs/
+          if-no-files-found: ignore
