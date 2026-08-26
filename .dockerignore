@@ -1,0 +1,10 @@
+.venv
+.env
+.git
+__pycache__
+.pytest_cache
+runs
+evidence_*.png
+results.json
+qa_report.md
+test_TC*.py
