@@ -50,7 +50,10 @@ jobs:
       - name: Run AI QA Agent
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          CI_STORY: "Como usuario quiero iniciar sesión con mi usuario y contraseña para acceder al sistema."
+          CI_STORY: "Como usuario quiero iniciar sesión con mi usuario y contraseña para acceder al sistema.
+	  BASE_URL: "https://www.saucedemo.com/"
+          TEST_USERNAME: "standard_user"
+          TEST_PASSWORD: "secret_sauce""
         run: python app.py
 
       - name: Upload QA artifacts
