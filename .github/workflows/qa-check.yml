@@ -34,7 +34,7 @@ jobs:
         run: playwright install --with-deps chromium
 
       - name: Check Python syntax
-        run: python -m py_compile app.py
+        run: python -m py_compile app.py web_app.py src/*.py
 
       - name: Verify imports
         run: |

@@ -78,3 +78,29 @@ def test_bug_report_generation():
     assert "High" in reporte
     assert "evidence_TC001.png" in reporte
     assert "El usuario accede al sistema" in reporte
+
+from src.url_validator import validar_url
+
+
+def test_url_validator_accepts_public_https():
+    resultado = validar_url(
+        "https://example.com"
+    )
+
+    assert resultado["valid"] is True
+
+
+def test_url_validator_rejects_localhost():
+    resultado = validar_url(
+        "http://localhost:8000"
+    )
+
+    assert resultado["valid"] is False
+
+
+def test_url_validator_rejects_private_ip():
+    resultado = validar_url(
+        "http://192.168.1.10"
+    )
+
+    assert resultado["valid"] is False
