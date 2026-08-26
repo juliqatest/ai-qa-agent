@@ -24,3 +24,19 @@ TEST_PASSWORD = os.getenv(
 TEST_TIMEOUT = int(
     os.getenv("TEST_TIMEOUT", "45")
 )
+
+MAX_TEST_CASES = int(
+    os.getenv("MAX_TEST_CASES", "5")
+)
+
+RUN_TIMEOUT = int(
+    os.getenv("RUN_TIMEOUT", "180")
+)
+
+MAX_SITE_ELEMENTS = int(
+    os.getenv("MAX_SITE_ELEMENTS", "100")
+)
+
+MAX_PAGE_TEXT = int(
+    os.getenv("MAX_PAGE_TEXT", "3000")
+)

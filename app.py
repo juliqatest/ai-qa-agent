@@ -13,6 +13,7 @@ from src.test_runner import ejecutar_test
 from src.code_validator import validar_codigo_python
 from src.code_fixer import corregir_codigo
 from src.config import MODEL, TEST_TIMEOUT
+from src.site_inspector import inspeccionar_sitio
 
 load_dotenv()
 
@@ -25,6 +26,27 @@ print("\n🤖 AI QA AGENT")
 print("============================")
 print("Historia → Tests → Playwright → Análisis → Reporte\n")
 
+ci_url = os.getenv("BASE_URL")
+
+if ci_url:
+    base_url = ci_url.strip()
+    print(f"URL a probar: {base_url}")
+else:
+    base_url = input("URL a probar: ").strip()
+
+ci_username = os.getenv("TEST_USERNAME")
+ci_password = os.getenv("TEST_PASSWORD")
+
+if ci_username:
+    test_username = ci_username.strip()
+else:
+    test_username = input("Usuario/email de prueba (opcional): ").strip()
+
+if ci_password:
+    test_password = ci_password.strip()
+else:
+    test_password = input("Contraseña de prueba (opcional): ").strip()
+
 ci_story = os.getenv("CI_STORY")
 
 if ci_story:
@@ -36,6 +58,15 @@ else:
 if historia.lower() == "salir":
     print("Agente finalizado.")
     exit()
+print("\n🔎 Inspeccionando sitio...")
+
+site_context = inspeccionar_sitio(
+    base_url=base_url,
+    headless=HEADLESS
+)
+
+print(f"✅ Sitio inspeccionado: {site_context['title']}")
+print(f"✅ Elementos detectados: {len(site_context['elements'])}")
 
 # ============================================================
 # 1. GENERAR CASOS DE PRUEBA
@@ -78,9 +109,12 @@ for test in datos["test_cases"]:
         client=client,
         model=MODEL,
         test=test,
-        headless=HEADLESS
-    )
-
+        headless=HEADLESS,
+        base_url=base_url,
+        site_context=site_context,
+        test_username=test_username,
+        test_password=test_password
+)
     validacion = validar_codigo_python(codigo)
 
     if not validacion["valid"]:
